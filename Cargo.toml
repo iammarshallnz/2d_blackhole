@@ -1,8 +1,8 @@
 [package]
-name = "hello-wasm"
+name = "blackhole"
 version = "0.1.0"
 authors = ["Marshall <marshallinch@gmail.com>"]
-description = "A sample project with wasm-pack"
+description = "A 2d blackhole simulation with wasm-pack adapted from https://github.com/kavan010/black_hole"
 license = "MIT/Apache-2.0"
 repository = "https://github.com/iammarshallnz/hello-wasm"
 edition = "2024"
@@ -13,6 +13,4 @@ crate-type = ["cdylib"]
 [dependencies]
 js-sys = "0.3.90"
 wasm-bindgen = "0.2"
-rand = "0.8"
-getrandom = { version = "0.2", features = ["js"] }
 nalgebra = "0.34.1"

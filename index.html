@@ -4,15 +4,32 @@
     <meta charset="utf-8" />
     <title>hello-wasm example</title>
   </head>
-  <body>
+  <body style="margin: 0; padding: 0;">
     <div
       style="
         display: flex;
-        justify-content: center; /* horizontal */
-        align-items: center; /* vertical */
-        height: 100vh; /* full viewport height */
+        flex-direction: column; /* Stack elements vertically */
+        justify-content: flex-start; /* Start from top */
+        align-items: center;
+        height: 100vh;
+        padding-top: 20px; /* Space from top */
+        box-sizing: border-box;
+        background-color: #282626;
       "
     >
+      <!-- Slider controls -->
+      <div
+        style="
+          margin-bottom: 10px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        "
+      >
+        <label for="massSlider" style="color: white;">Black Hole Mass (10^36 kg)</label>
+        <input type="range" id="massSlider" min="1" max="20" value="8" />
+        <span id="massValue">8</span>
+      </div>
       <canvas
         id="myCanvas"
         width="300"
