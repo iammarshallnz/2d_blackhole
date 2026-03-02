@@ -1,17 +1,18 @@
+#![allow(non_snake_case)]
 mod common;
 
-use nalgebra::Vector2;
+use nalgebra::{Rotation2, Vector2, Vector4};
 use std::collections::VecDeque;
 use wasm_bindgen::prelude::*;
 
 const WIDTH: usize = 300;
 const HEIGHT: usize = 300;
 
-macro_rules! console_log {
-    // Note that this is using the `log` function imported above during
-    // `bare_bones`
-    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
-}
+// macro_rules! console_log {
+//     // Note that this is using the `log` function imported above during
+//     // `bare_bones`
+//     ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
+// }
 
 #[wasm_bindgen]
 extern "C" {
@@ -27,14 +28,12 @@ pub fn greet(name: &str) {
 
 struct Blackhole {
     pos: Vector2<f64>,
-    mass: f64,
-    r_s: f64,
+    r_s: f64, // event horizon
 }
 impl Blackhole {
     fn new(pos: Vector2<f64>, mass: f64) -> Blackhole {
         Blackhole {
             pos,
-            mass,
             r_s: (2.0 * common::G * mass) / (common::C * common::C),
         }
     }
@@ -71,21 +70,20 @@ impl Blackhole {
 }
 
 struct Ray {
-    // Cartesian for rendering
+    // -- Cartesian coords -- //
     pub pos: Vector2<f64>,
 
-    // Polar for physics
+    // -- Polar coords -- //
     pub r: f64,
     pub phi: f64,
     pub dr: f64,
     pub dphi: f64,
 
-    // Trail of positions
-    pub trail: VecDeque<Vector2<f64>>, // could limit size
+    // Trail of points
+    pub trail: VecDeque<Vector2<f64>>,
 
     // Conserved quantities
     pub E: f64,
-    pub L: f64,
 }
 
 impl Ray {
@@ -93,13 +91,15 @@ impl Ray {
         let rel = pos - bh_pos; // relative to black hole
         let x = rel.x;
         let y = rel.y;
-        let r = (x * x + y * y).sqrt();
+        let r = rel.norm();
         let phi = y.atan2(x);
 
-        let dr = dir.x * phi.cos() + dir.y * phi.sin();
-        let dphi = (-dir.x * phi.sin() + dir.y * phi.cos()) / r;
+        let radial = rel.normalize();
+        let tangential = Vector2::new(-radial.y, radial.x);
 
-        let L = r * r * dphi;
+        let dr = dir.dot(&radial);
+        let dphi = dir.dot(&tangential) / r;
+
         let f = 1.0 - r_s / r;
         let dt_dlambda = ((dr * dr) / (f * f) + (r * r * dphi * dphi) / f).sqrt();
         let E = f * dt_dlambda;
@@ -115,7 +115,6 @@ impl Ray {
             dphi,
             trail,
             E,
-            L,
         }
     }
     fn draw(
@@ -149,11 +148,13 @@ impl Ray {
         } // inside event horizon
 
         // RK4 integration
-        rk4_step(self, d_lambda, bh.pos, bh.r_s);
+        rk4_step(self, d_lambda, bh.r_s);
 
         // update Cartesian for drawing
-        self.pos.x = self.r * self.phi.cos() + bh.pos.x;
-        self.pos.y = self.r * self.phi.sin() + bh.pos.y;
+        let rot = Rotation2::new(self.phi);
+        let cart = rot * Vector2::new(self.r, 0.0);
+
+        self.pos = cart + bh.pos;
     }
 
     fn draw_trail(
@@ -181,83 +182,35 @@ impl Ray {
     }
 }
 
-fn geodesic_rhs(ray: &Ray, bh_pos: Vector2<f64>, r_s: f64) -> [f64; 4] {
-    let rel = ray.pos - bh_pos;
-    let r = (rel.x * rel.x + rel.y * rel.y).sqrt();
-    let dr = ray.dr;
-    let dphi = ray.dphi;
-    let E = ray.E;
+fn geodesic_rhs_from_state(state: &Vector4<f64>, E: f64, r_s: f64) -> Vector4<f64> {
+    let r = state[0];
+    let dr = state[2];
+    let dphi = state[3];
 
     let f = 1.0 - r_s / r;
+    let dt_dλ = E / f;
 
-    let dt_dlambda = E / f;
-
-    let d2r = -(r_s / (2.0 * r * r)) * f * (dt_dlambda * dt_dlambda)
+    let d2r = -(r_s / (2.0 * r * r)) * f * (dt_dλ * dt_dλ)
         + (r_s / (2.0 * r * r * f)) * (dr * dr)
         + (r - r_s) * (dphi * dphi);
 
     let d2phi = -2.0 * dr * dphi / r;
 
-    [dr, dphi, d2r, d2phi]
+    Vector4::new(dr, dphi, d2r, d2phi)
 }
 
-fn add_state(a: &[f64; 4], b: &[f64; 4], factor: f64) -> [f64; 4] {
-    [
-        a[0] + b[0] * factor,
-        a[1] + b[1] * factor,
-        a[2] + b[2] * factor,
-        a[3] + b[3] * factor,
-    ]
-}
+fn rk4_step(ray: &mut Ray, d_lambda: f64, r_s: f64) {
+    let y0 = Vector4::new(ray.r, ray.phi, ray.dr, ray.dphi);
 
-fn rk4_step(ray: &mut Ray, d_lambda: f64, bh_pos: Vector2<f64>, r_s: f64) {
-    let y0 = [ray.r, ray.phi, ray.dr, ray.dphi];
+    let k1 = geodesic_rhs_from_state(&y0, ray.E, r_s);
+    let k2 = geodesic_rhs_from_state(&(y0 + k1 * (d_lambda / 2.0)), ray.E, r_s);
+    let k3 = geodesic_rhs_from_state(&(y0 + k2 * (d_lambda / 2.0)), ray.E, r_s);
+    let k4 = geodesic_rhs_from_state(&(y0 + k3 * d_lambda), ray.E, r_s);
 
-    let k1 = geodesic_rhs(ray, bh_pos, r_s);
-
-    let temp = add_state(&y0, &k1, d_lambda / 2.0);
-    let r2 = Ray {
-        pos: ray.pos,
-        r: temp[0],
-        phi: temp[1],
-        dr: temp[2],
-        dphi: temp[3],
-        trail: VecDeque::new(),
-        E: ray.E,
-        L: ray.L,
-    };
-    let k2 = geodesic_rhs(&r2, bh_pos, r_s);
-
-    let temp = add_state(&y0, &k2, d_lambda / 2.0);
-    let r3 = Ray {
-        pos: ray.pos,
-        r: temp[0],
-        phi: temp[1],
-        dr: temp[2],
-        dphi: temp[3],
-        trail: VecDeque::new(),
-        E: ray.E,
-        L: ray.L,
-    };
-    let k3 = geodesic_rhs(&r3, bh_pos, r_s);
-
-    let temp = add_state(&y0, &k3, d_lambda);
-    let r4 = Ray {
-        pos: ray.pos,
-        r: temp[0],
-        phi: temp[1],
-        dr: temp[2],
-        dphi: temp[3],
-        trail: VecDeque::new(),
-        E: ray.E,
-        L: ray.L,
-    };
-    let k4 = geodesic_rhs(&r4, bh_pos, r_s);
-
-    ray.r += d_lambda / 6.0 * (k1[0] + 2.0 * k2[0] + 2.0 * k3[0] + k4[0]);
-    ray.phi += d_lambda / 6.0 * (k1[1] + 2.0 * k2[1] + 2.0 * k3[1] + k4[1]);
-    ray.dr += d_lambda / 6.0 * (k1[2] + 2.0 * k2[2] + 2.0 * k3[2] + k4[2]);
-    ray.dphi += d_lambda / 6.0 * (k1[3] + 2.0 * k2[3] + 2.0 * k3[3] + k4[3]);
+    ray.r += (d_lambda / 6.0) * (k1[0] + 2.0 * k2[0] + 2.0 * k3[0] + k4[0]);
+    ray.phi += (d_lambda / 6.0) * (k1[1] + 2.0 * k2[1] + 2.0 * k3[1] + k4[1]);
+    ray.dr += (d_lambda / 6.0) * (k1[2] + 2.0 * k2[2] + 2.0 * k3[2] + k4[2]);
+    ray.dphi += (d_lambda / 6.0) * (k1[3] + 2.0 * k2[3] + 2.0 * k3[3] + k4[3]);
 }
 
 #[wasm_bindgen]
@@ -278,13 +231,14 @@ impl Renderer {
 
         let mut rays = Vec::new();
         let blackhole = Blackhole::new(Vector2::new(0.0, 0.0), 8.54e36);
-        rays.push(Ray::new( // cool cycle
-                Vector2::new(-1e11,  3.28409215719999999e10), 
-                Vector2::new(common::C, 0.0),
-                blackhole.pos,
-                blackhole.r_s,
-            ));
-        
+        rays.push(Ray::new(
+            // cool cycle
+            Vector2::new(-1e11, 3.27608302719999999e10),
+            Vector2::new(common::C, 0.0),
+            blackhole.pos,
+            blackhole.r_s,
+        ));
+
         Renderer {
             buffer: vec![0; WIDTH * HEIGHT * 4],
             blackhole: blackhole,
@@ -309,8 +263,8 @@ impl Renderer {
         }
 
         for ray in &mut self.rays {
-            let steps_per_frame = 2;
-            let dt = 1.0;
+            let steps_per_frame = 20;
+            let dt = 0.1;
             for _ in 0..steps_per_frame {
                 ray.step(dt, &self.blackhole);
             }
