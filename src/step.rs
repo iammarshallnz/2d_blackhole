@@ -6,6 +6,7 @@ use crate::ray::Ray;
 // https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods#The_Runge%E2%80%93Kutta_method
 
 fn geodesic_rhs_from_state(state: &Vector4<f64>, E: f64, r_s: f64) -> Vector4<f64> {
+    // Schwarzschild geodesics 
     let r = state[0];
     let dr = state[2];
     let dphi = state[3];
