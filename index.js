@@ -17,8 +17,11 @@ async function run() {
 
     const x = (event.clientX - rect.left) * scaleX;
     const y = (event.clientY - rect.top) * scaleY;
-
-    renderer.add_ray_from_click(x, y);
+    try {
+      renderer.add_ray_from_click(x, y);
+    } catch (e) {
+      console.error("Simulation error:", e.message);
+    }
   });
 
   const slider = document.getElementById("massSlider");
@@ -31,7 +34,11 @@ async function run() {
     // Convert 10^36 kg to real value
     const mass = mass36 * 1e36;
 
-    renderer.set_blackhole_mass(mass);
+    try {
+      renderer.set_blackhole_mass(mass);
+    } catch (e) {
+      console.error("Simulation error:", e.message);
+    }
   });
 
   const fps = 60;

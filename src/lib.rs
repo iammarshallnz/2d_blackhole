@@ -13,8 +13,7 @@ use crate::{blackhole::Blackhole, ray::Ray};
 const WIDTH: usize = 300;
 const HEIGHT: usize = 300;
 
-
-/// comunication with js front end 
+/// comunication with js front end
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = console)]
@@ -28,7 +27,7 @@ macro_rules! console_log {
 }
 
 /// Rendering for the blackhole and rays.
-/// and also managment of objects in the scene 
+/// and also managment of objects in the scene
 #[wasm_bindgen]
 pub struct Renderer {
     buffer: Vec<u8>,
@@ -68,8 +67,11 @@ impl Renderer {
     pub fn buffer_ptr(&self) -> *const u8 {
         self.buffer.as_ptr()
     }
-
-    pub fn add_ray_from_click(&mut self, mouse_x: f64, mouse_y: f64) {
+    
+    pub fn add_ray_from_click(&mut self, mouse_x: f64, mouse_y: f64) -> Result<(), JsError> {
+        if mouse_x < 0.0 || mouse_y < 0.0 {
+            return Err(JsError::new("Click coordinates must be non-negative"));
+        }
         // Convert screen (pixels) to world coordinates
         let center = Vector2::new(WIDTH as f64 / 2.0, HEIGHT as f64 / 2.0);
 
@@ -78,18 +80,26 @@ impl Renderer {
 
         let world_pos = (screen - center) * self.scale + self.offset;
         if (world_pos - self.blackhole.pos).norm() <= self.blackhole.r_s {
-            return;
+            return Ok(());
         }
         let dir = Vector2::new(common::C, 0.0); // always spawn ray going left 
 
         let ray = Ray::new(world_pos, dir, self.blackhole.pos, self.blackhole.r_s);
 
         self.rays.push(ray);
+        Ok(())
     }
-    
-    pub fn set_blackhole_mass(&mut self, mass: f64) {
+
+    pub fn set_blackhole_mass(&mut self, mass: f64) -> Result<(), JsError> {
+        if mass <= 0.0 {
+            return Err(JsError::new("Black hole mass must be positive"));
+        }
+        if mass > 1e38 {
+            return Err(JsError::new("Mass exceeds simulation limits"));
+        }
         self.blackhole.mass = mass;
         self.blackhole.r_s = (2.0 * common::G * mass) / (common::C * common::C);
+        Ok(())
     }
 
     pub fn update(&mut self) {
