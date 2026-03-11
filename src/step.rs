@@ -3,6 +3,7 @@ use crate::ray::Ray;
 
 
 /// Ranga kuta step function and helper
+// https://en.wikipedia.org/wiki/Runge%E2%80%93Kutta_methods#The_Runge%E2%80%93Kutta_method
 
 fn geodesic_rhs_from_state(state: &Vector4<f64>, E: f64, r_s: f64) -> Vector4<f64> {
     let r = state[0];
@@ -23,7 +24,7 @@ fn geodesic_rhs_from_state(state: &Vector4<f64>, E: f64, r_s: f64) -> Vector4<f6
 
 pub fn rk4_step(ray: &mut Ray, d_λ: f64, r_s: f64) {
     let y0 = Vector4::new(ray.r, ray.phi, ray.dr, ray.dphi);
-
+    
     let k1 = geodesic_rhs_from_state(&y0, ray.E, r_s);
     let k2 = geodesic_rhs_from_state(&(y0 + k1 * (d_λ / 2.0)), ray.E, r_s);
     let k3 = geodesic_rhs_from_state(&(y0 + k2 * (d_λ / 2.0)), ray.E, r_s);

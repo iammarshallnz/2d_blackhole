@@ -13,22 +13,22 @@ use crate::{blackhole::Blackhole, ray::Ray};
 const WIDTH: usize = 300;
 const HEIGHT: usize = 300;
 
-/// Rendering for the blackhole and rays.
-/// plus comunicating with js front end 
 
-// macro_rules! console_log {
-//     // Note that this is using the `log` function imported above during
-//     // `bare_bones`
-//     ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
-// }
-
+/// comunication with js front end 
 #[wasm_bindgen]
 extern "C" {
-    pub fn alert(s: &str);
     #[wasm_bindgen(js_namespace = console)]
     fn log(s: &str);
 }
 
+macro_rules! console_log {
+    // Note that this is using the `log` function imported above during
+    // `bare_bones`
+    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
+}
+
+/// Rendering for the blackhole and rays.
+/// and also managment of objects in the scene 
 #[wasm_bindgen]
 pub struct Renderer {
     buffer: Vec<u8>,
@@ -43,10 +43,10 @@ impl Renderer {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Renderer {
         let scale = 1e9; // 1 pixel per
-        let offset = Vector2::new(0.0, 0.0); // center in world coordinates
+        let offset = Vector2::new(0.0, 0.0); // center in world coordinates, 1e9 is 1 pixel
 
         let mut rays = Vec::new();
-        let blackhole = Blackhole::new(Vector2::new(0.0, 0.0), 8.54e36);
+        let blackhole = Blackhole::new(Vector2::new(0.0, 0.0), 8.54e36); // Sagittarius A black hole
         #[allow(clippy::excessive_precision)]
         rays.push(Ray::new(
             // cool cycle
@@ -73,13 +73,14 @@ impl Renderer {
         // Convert screen (pixels) to world coordinates
         let center = Vector2::new(WIDTH as f64 / 2.0, HEIGHT as f64 / 2.0);
 
+        console_log!("Spawning ray at {} {}", mouse_x, mouse_y);
         let screen = Vector2::new(mouse_x, mouse_y);
 
         let world_pos = (screen - center) * self.scale + self.offset;
         if (world_pos - self.blackhole.pos).norm() <= self.blackhole.r_s {
             return;
         }
-        let dir = Vector2::new(common::C, 0.0);
+        let dir = Vector2::new(common::C, 0.0); // always spawn ray going left 
 
         let ray = Ray::new(world_pos, dir, self.blackhole.pos, self.blackhole.r_s);
 
@@ -101,19 +102,21 @@ impl Renderer {
             self.buffer[idx + 3] = 255;
         }
 
+        // retain_mut runs a function in a closure and removes from vec when false is returned
         self.rays.retain_mut(|ray| {
             let steps_per_frame = 20;
-            let dt = 0.1;
+            let dt = 0.1; // step size 
             for _ in 0..steps_per_frame {
-                ray.step(dt, &self.blackhole);
+                ray.step(dt, &self.blackhole); // step function 
             }
 
             ray.draw_trail(&mut self.buffer, WIDTH, HEIGHT, self.scale, self.offset);
 
-            let max_radius = 3.0e11;
+            let max_radius = 3.0e11; // delete outside of this radius 
 
             ray.draw(&mut self.buffer, WIDTH, HEIGHT, self.scale, self.offset);
             if (ray.pos - self.blackhole.pos).norm() > max_radius {
+                console_log!("Deleting ray outside radius at {}", ray.pos);
                 false
             } else {
                 true

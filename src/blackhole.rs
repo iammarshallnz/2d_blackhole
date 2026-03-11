@@ -25,15 +25,17 @@ impl Blackhole {
         scale: f64,
         offset: Vector2<f64>,
     ) {
-        let cx = ((self.pos.x - offset.x) / scale) as i32 + (width / 2) as i32;
-        let cy = ((self.pos.y - offset.y) / scale) as i32 + (height / 2) as i32;
+
+        let center_x = ((self.pos.x - offset.x) / scale) as i32 + (width / 2) as i32;
+        let center_y = ((self.pos.y - offset.y) / scale) as i32 + (height / 2) as i32;
         let radius = (self.r_s / scale) as i32;
 
         for y in -radius..=radius {
             for x in -radius..=radius {
+                // x^2 + y^2 = r^2
                 if x * x + y * y <= radius * radius {
-                    let px = cx + x;
-                    let py = cy + y;
+                    let px = center_x + x;
+                    let py = center_y + y;
 
                     if px >= 0 && px < width as i32 && py >= 0 && py < height as i32 {
                         let idx = (py as usize * width + px as usize) * 4;

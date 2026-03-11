@@ -1,7 +1,7 @@
-use nalgebra::{Rotation2, Vector2};
-use std::collections::VecDeque;
 use crate::blackhole::Blackhole;
 use crate::step::rk4_step;
+use nalgebra::{Rotation2, Vector2};
+use std::collections::VecDeque;
 
 /// Ray struct
 /// 
@@ -28,6 +28,7 @@ impl Ray {
         let rel = pos - bh_pos; // relative to black hole
         let x = rel.x;
         let y = rel.y;
+        // create ploar coords https://en.wikipedia.org/wiki/Polar_coordinate_system#Converting_between_polar_and_Cartesian_coordinates
         let r = rel.norm();
         let phi = y.atan2(x);
 
@@ -69,9 +70,8 @@ impl Ray {
             self.trail.pop_front();
         }
 
-        let ray = (self.pos - offset) / scale;
+        let ray: Vector2<f64> = (self.pos - offset) / scale;
         let pixel = ray + Vector2::new(width as f64 / 2.0, height as f64 / 2.0);
-        
 
         if pixel.x >= 0.0 && pixel.x < width as f64 && pixel.y >= 0.0 && pixel.y < height as f64 {
             let idx = (pixel.y as usize * width + pixel.x as usize) * 4;
@@ -87,10 +87,11 @@ impl Ray {
             return;
         } // inside event horizon no light escapes 
 
-        // RK4 
+        // RK4
         rk4_step(self, d_λ, bh.r_s);
 
-        // polar to cartesian
+        // polar to cartesian 
+        // can also use Vector2::new(self.r * self.phi.cos(), self.r * self.phi.sin()); instead
         let rot = Rotation2::new(self.phi);
         let cartesian = rot * Vector2::new(self.r, 0.0);
 
@@ -113,7 +114,7 @@ impl Ray {
             if pixel.x >= 0.0 && pixel.x < width as f64 && pixel.y >= 0.0 && pixel.y < height as f64
             {
                 let idx = (pixel.y as usize * width + pixel.x as usize) * 4;
-
+                // get lighter over length 
                 buffer[idx] = (200.0 * ratio) as u8;
                 buffer[idx + 1] = (200.0 * ratio) as u8;
                 buffer[idx + 2] = (200.0 * ratio) as u8;
