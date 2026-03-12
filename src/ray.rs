@@ -4,7 +4,7 @@ use nalgebra::{Rotation2, Vector2};
 use std::collections::VecDeque;
 
 /// Ray struct
-/// 
+///
 
 pub struct Ray {
     // -- Cartesian coords -- //
@@ -19,7 +19,7 @@ pub struct Ray {
     // Trail of points
     pub trail: VecDeque<Vector2<f64>>,
 
-    // Conserved quantities
+    // Conserved quantity
     pub E: f64,
 }
 
@@ -42,7 +42,7 @@ impl Ray {
         let dt_dλ = ((dr * dr) / (f * f) + (r * r * dphi * dphi) / f).sqrt();
         let E = f * dt_dλ;
 
-        let mut trail = VecDeque::new();
+        let mut trail = VecDeque::new(); // trail of points
         trail.push_back(pos);
 
         Ray {
@@ -55,14 +55,7 @@ impl Ray {
             E,
         }
     }
-    pub fn draw(
-        &mut self,
-        buffer: &mut [u8],
-        width: usize,
-        height: usize,
-        scale: f64,
-        offset: Vector2<f64>,
-    ) {
+    pub fn draw(&mut self, buffer: &mut [u8], width: usize, height: usize, scale: f64) {
         // push to trail
         const MAX_TRAIL: usize = 200;
         self.trail.push_back(self.pos);
@@ -70,7 +63,7 @@ impl Ray {
             self.trail.pop_front();
         }
 
-        let ray: Vector2<f64> = (self.pos - offset) / scale;
+        let ray: Vector2<f64> = (self.pos) / scale;
         let pixel = ray + Vector2::new(width as f64 / 2.0, height as f64 / 2.0);
 
         if pixel.x >= 0.0 && pixel.x < width as f64 && pixel.y >= 0.0 && pixel.y < height as f64 {
@@ -90,31 +83,24 @@ impl Ray {
         // RK4
         rk4_step(self, d_λ, bh.r_s);
 
-        // polar to cartesian 
+        // polar to cartesian
         // can also use Vector2::new(self.r * self.phi.cos(), self.r * self.phi.sin()); instead
-        let rot = Rotation2::new(self.phi);
+        let rot = Rotation2::new(self.phi); // 2x1 matrix of cos sin based on radian 
         let cartesian = rot * Vector2::new(self.r, 0.0);
 
         self.pos = cartesian + bh.pos; // relitive to blackhole 
     }
 
-    pub fn draw_trail(
-        &self,
-        buffer: &mut [u8],
-        width: usize,
-        height: usize,
-        scale: f64,
-        offset: Vector2<f64>,
-    ) {
+    pub fn draw_trail(&self, buffer: &mut [u8], width: usize, height: usize, scale: f64) {
         let size = self.trail.len();
         for (index, point) in self.trail.iter().enumerate() {
-            let trail = (point - offset) / scale;
+            let trail = (point) / scale;
             let pixel = trail + Vector2::new(width as f64 / 2.0, height as f64 / 2.0);
             let ratio: f64 = index as f64 / size as f64;
             if pixel.x >= 0.0 && pixel.x < width as f64 && pixel.y >= 0.0 && pixel.y < height as f64
             {
                 let idx = (pixel.y as usize * width + pixel.x as usize) * 4;
-                // get lighter over length 
+                // get lighter over length
                 buffer[idx] = (200.0 * ratio) as u8;
                 buffer[idx + 1] = (200.0 * ratio) as u8;
                 buffer[idx + 2] = (200.0 * ratio) as u8;

@@ -1,5 +1,5 @@
-use nalgebra::Vector2;
 use crate::common;
+use nalgebra::Vector2;
 
 /// Blackhole struct
 /// Can only have 1 blackhole due to using non Newtonian method for the step
@@ -17,17 +17,9 @@ impl Blackhole {
             r_s: (2.0 * common::G * mass) / (common::C * common::C),
         }
     }
-    pub fn draw(
-        &self,
-        buffer: &mut [u8],
-        width: usize,
-        height: usize,
-        scale: f64,
-        offset: Vector2<f64>,
-    ) {
-
-        let center_x = ((self.pos.x - offset.x) / scale) as i32 + (width / 2) as i32;
-        let center_y = ((self.pos.y - offset.y) / scale) as i32 + (height / 2) as i32;
+    pub fn draw(&self, buffer: &mut [u8], width: usize, height: usize, scale: f64) {
+        let center_x = ((self.pos.x) / scale) as i32 + (width / 2) as i32;
+        let center_y = ((self.pos.y) / scale) as i32 + (height / 2) as i32;
         let radius = (self.r_s / scale) as i32;
 
         for y in -radius..=radius {

@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 mod blackhole;
 mod common;
+mod grid;
 mod ray;
 mod step;
 
@@ -8,7 +9,7 @@ use nalgebra::Vector2;
 
 use wasm_bindgen::prelude::*;
 
-use crate::{blackhole::Blackhole, ray::Ray};
+use crate::{blackhole::Blackhole, grid::Grid, ray::Ray};
 
 const WIDTH: usize = 300;
 const HEIGHT: usize = 300;
@@ -33,8 +34,8 @@ pub struct Renderer {
     buffer: Vec<u8>,
     blackhole: Blackhole,
     rays: Vec<Ray>,
-    scale: f64,           // world units per pixel
-    offset: Vector2<f64>, // world position at the center of the screen
+    scale: f64, // world units per pixel
+    grid: Grid,
 }
 
 #[wasm_bindgen]
@@ -42,7 +43,6 @@ impl Renderer {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Renderer {
         let scale = 1e9; // 1 pixel per
-        let offset = Vector2::new(0.0, 0.0); // center in world coordinates, 1e9 is 1 pixel
 
         let mut rays = Vec::new();
         let blackhole = Blackhole::new(Vector2::new(0.0, 0.0), 8.54e36); // Sagittarius A black hole
@@ -55,19 +55,20 @@ impl Renderer {
             blackhole.r_s,
         ));
 
+        let grid = Grid::new(40.0 * scale, 20);
         Renderer {
             buffer: vec![0; WIDTH * HEIGHT * 4],
             blackhole,
             rays,
             scale,
-            offset,
+            grid,
         }
     }
     // For js to access buffer
     pub fn buffer_ptr(&self) -> *const u8 {
         self.buffer.as_ptr()
     }
-    
+
     pub fn add_ray_from_click(&mut self, mouse_x: f64, mouse_y: f64) -> Result<(), JsError> {
         if mouse_x < 0.0 || mouse_y < 0.0 {
             return Err(JsError::new("Click coordinates must be non-negative"));
@@ -78,7 +79,7 @@ impl Renderer {
         console_log!("Spawning ray at {} {}", mouse_x, mouse_y);
         let screen = Vector2::new(mouse_x, mouse_y);
 
-        let world_pos = (screen - center) * self.scale + self.offset;
+        let world_pos = (screen - center) * self.scale;
         if (world_pos - self.blackhole.pos).norm() <= self.blackhole.r_s {
             return Ok(());
         }
@@ -112,6 +113,14 @@ impl Renderer {
             self.buffer[idx + 3] = 255;
         }
 
+        self.grid.draw(
+            &mut self.buffer,
+            WIDTH,
+            HEIGHT,
+            self.scale,
+            self.blackhole.r_s,
+        );
+
         // retain_mut runs a function in a closure and removes from vec when false is returned
         self.rays.retain_mut(|ray| {
             let steps_per_frame = 20;
@@ -120,11 +129,11 @@ impl Renderer {
                 ray.step(dt, &self.blackhole); // step function 
             }
 
-            ray.draw_trail(&mut self.buffer, WIDTH, HEIGHT, self.scale, self.offset);
+            ray.draw_trail(&mut self.buffer, WIDTH, HEIGHT, self.scale);
 
             let max_radius = 3.0e11; // delete outside of this radius 
 
-            ray.draw(&mut self.buffer, WIDTH, HEIGHT, self.scale, self.offset);
+            ray.draw(&mut self.buffer, WIDTH, HEIGHT, self.scale);
             if (ray.pos - self.blackhole.pos).norm() > max_radius {
                 console_log!("Deleting ray outside radius at {}", ray.pos);
                 false
@@ -134,7 +143,7 @@ impl Renderer {
         });
 
         self.blackhole
-            .draw(&mut self.buffer, WIDTH, HEIGHT, self.scale, self.offset);
+            .draw(&mut self.buffer, WIDTH, HEIGHT, self.scale);
     }
 }
 
