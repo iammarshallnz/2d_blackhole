@@ -1,8 +1,8 @@
 {
-  "name": "hello-wasm",
+  "name": "blackhole",
   "version": "0.1.0",
   "type": "module",
-  "description": "A sample project with wasm-pack",
+  "description": "A sample project using wasm-pack",
   "license": "MIT/Apache-2.0",
   "scripts": {
     "build": "wasm-pack build --target web --release",
